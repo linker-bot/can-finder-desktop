@@ -2,26 +2,59 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	"net"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// App struct
+type DeviceInfo struct {
+	Name    string `json:"name"`
+	IP      string `json:"ip"`
+	MAC     string `json:"mac"`
+	Model   string `json:"model"`
+	Version string `json:"version"`
+}
+
 type App struct {
 	ctx context.Context
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	go a.listenUDP()
 }
 
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+func (a *App) listenUDP() {
+	addr := net.UDPAddr{
+		Port: 9999,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+	conn, err := net.ListenUDP("udp4", &addr)
+	if err != nil {
+		runtime.LogError(a.ctx, "UDP listener error: "+err.Error())
+		return
+	}
+	defer conn.Close()
+
+	buffer := make([]byte, 1024)
+	for {
+		n, _, err := conn.ReadFromUDP(buffer)
+		if err != nil {
+			runtime.LogError(a.ctx, "UDP read error: "+err.Error())
+			continue
+		}
+
+		var device DeviceInfo
+		if err := json.Unmarshal(buffer[:n], &device); err != nil {
+			runtime.LogError(a.ctx, "JSON parse error: "+err.Error())
+			continue
+		}
+
+		runtime.EventsEmit(a.ctx, "device-update", device)
+	}
 }
