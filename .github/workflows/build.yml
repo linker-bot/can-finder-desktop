@@ -1,4 +1,4 @@
-name: Build Wails Desktop App
+name: Release Desktop App
 
 on:
   push:
@@ -6,11 +6,15 @@ on:
       - "v*.*.*"
   workflow_dispatch:
 
+env:
+  NODE_OPTIONS: "--max-old-space-size=4096"
+
 jobs:
-  build:
+  release:
+    name: Release Desktop App
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -18,43 +22,137 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set build name with tag
+        shell: bash
+        run: |
+          OS_NAME=$(echo "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
+          if [ "$OS_NAME" = "macos" ]; then OS_NAME="darwin"; fi
+          echo "BUILD_NAME=can-finder-${GITHUB_REF_NAME}.${OS_NAME}-amd64" >> $GITHUB_ENV
+          version=$(echo ${GITHUB_REF_NAME} | sed -e 's/^v//')
+          echo "BUILD_VER=$version" >> $GITHUB_ENV
+
+      - name: Echo vars
+        shell: bash
+        run: |
+          echo "Build name: ${{ env.BUILD_NAME }}"
+          echo "Version: ${{ env.BUILD_VER }}"
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
-
-      - name: Install dependencies (Ubuntu)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev build-essential pkg-config
-
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install gtk+3 webkitgtk pkg-config
+          go-version: "1.24.0"
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Verify Installation
-        run: wails doctor
-
-      - name: Build Application (Linux/MacOS)
-        if: runner.os != 'Windows'
+        shell: bash
         run: |
-          wails build -clean -platform ${{ runner.os == 'Linux' && 'linux/amd64' || 'darwin/universal' }}
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+          wails doctor
 
-      - name: Build Application (Windows)
+      - name: Update frontend version
+        shell: bash
+        run: |
+          jq '.info.productVersion = "${{ env.BUILD_VER }}"' wails.json > tmp.json
+          mv tmp.json wails.json
+          cd frontend
+          rm -f package-lock.json
+          jq '.version = "${{ env.BUILD_VER }}"' package.json > tmp.json
+          mv tmp.json package.json
+
+      - name: Install Linux prerequisites
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev jq build-essential pkg-config
+
+      - name: Install macOS prerequisites
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install gtk+3 webkitgtk jq pkg-config
+
+      - name: Install Windows prerequisites
         if: runner.os == 'Windows'
-        run: |
-          wails build -clean -platform windows/amd64
-
-      - name: Upload Release Artifacts
-        uses: actions/upload-artifact@v4
+        uses: crazy-max/ghaction-chocolatey@v2
         with:
-          name: CAN-Finder-${{ matrix.os }}
-          path: |
-            build/bin/
-            build/*.app
-            build/*.exe
+          args: install nsis jq
+
+      - name: Build App (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          wails build -clean -tags webkit2_41 -o ${{ env.BUILD_NAME }}
+
+      - name: Build App (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          wails build -clean -platform darwin/universal
+
+      - name: Build NSIS Installer (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          wails build -clean -nsis -webview2 embed
+
+      - name: Rename Windows Installer
+        if: runner.os == 'Windows'
+        working-directory: ./build/bin
+        shell: powershell
+        run: |
+          Rename-Item -Path "*-installer.exe" -NewName "${{ env.BUILD_NAME }}.exe"
+
+      - name: Install nfpm (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+      - name: Package with nfpm (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          NAME=${{ env.BUILD_NAME }} VERSION=${{ env.BUILD_VER }} nfpm pkg --packager deb --config nfpm.yaml -t ${{ env.BUILD_NAME }}.deb
+          NAME=${{ env.BUILD_NAME }} VERSION=${{ env.BUILD_VER }} nfpm pkg --packager rpm --config nfpm.yaml -t ${{ env.BUILD_NAME }}.rpm
+
+      - name: Show build artifacts
+        shell: bash
+        run: |
+          ls -alh ./build/bin || true
+          ls -alh *.deb *.rpm || true
+          ls -alh build/*.app || true
+
+      - name: Archive macOS App
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cd build/bin
+          zip -r ../../${{ env.BUILD_NAME }}.zip *.app
+
+      - name: Upload Release Assets (Linux)
+        if: runner.os == 'Linux'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.deb
+            *.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Assets (macOS)
+        if: runner.os == 'macOS'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Assets (Windows)
+        if: runner.os == 'Windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/bin/${{ env.BUILD_NAME }}.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
