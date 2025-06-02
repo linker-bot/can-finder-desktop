@@ -85,12 +85,23 @@ jobs:
         run: |
           wails build -clean -nsis -webview2 embed
 
+      - name: Show build files (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          Get-ChildItem ./build/bin -Recurse -Force
+
       - name: Rename Windows Installer
         if: runner.os == 'Windows'
         working-directory: ./build/bin
         shell: powershell
         run: |
-          Rename-Item -Path "*-installer.exe" -NewName "${{ env.BUILD_NAME }}.exe"
+          $installer = Get-ChildItem "*-installer.exe" | Select-Object -First 1
+          if ($null -eq $installer) {
+            Write-Error "Installer not found!"
+            exit 1
+          }
+          Rename-Item -Path $installer.FullName -NewName "${{ env.BUILD_NAME }}.exe"
 
       - name: Install nfpm (Linux)
         if: runner.os == 'Linux'
