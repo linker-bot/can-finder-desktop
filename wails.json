@@ -1,0 +1,9 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "can-finder-desktop",
+  "outputfilename": "can-finder-desktop",
+  "author": {
+    "name": "Su Yang",
+    "email": "soulteary@gmail.com"
+  }
+}

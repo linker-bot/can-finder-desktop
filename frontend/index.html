@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CAN Finder Desktop</title>
+    <meta charset="UTF-8">
+    <style>
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; border: 1px solid #ccc; }
+        th { background-color: #f4f4f4; }
+    </style>
+    <script src="/wails/runtime.js"></script>
+</head>
+<body>
+    <h1>CAN Finder Device List</h1>
+    <table id="deviceTable">
+        <thead>
+            <tr>
+                <th>Device Name</th>
+                <th>IP</th>
+                <th>MAC</th>
+                <th>Model</th>
+                <th>Version</th>
+                <th>First Seen</th>
+                <th>Last Active</th>
+            </tr>
+        </thead>
+        <tbody id="devices"></tbody>
+    </table>
+
+    <script>
+        const devices = {};
+
+        window.runtime.EventsOn('device-update', (device) => {
+            const now = new Date().toLocaleString();
+            const deviceKey = device.mac;
+
+            if (!devices[deviceKey]) {
+                devices[deviceKey] = {
+                    ...device,
+                    firstSeen: now,
+                    lastSeen: now
+                };
+
+                const row = document.createElement('tr');
+                row.id = `device-${deviceKey}`;
+                row.innerHTML = `
+                    <td>${device.name}</td>
+                    <td>${device.ip}</td>
+                    <td>${device.mac}</td>
+                    <td>${device.model}</td>
+                    <td>
+                        <a href="https://github.com/linker-bot/can-bridge/releases/tag/v1.2.1/${device.version}" target="_blank">
+                            ${device.version}
+                        </a>
+                    </td>
+                    <td>${now}</td>
+                    <td>${now}</td>
+                `;
+                document.getElementById('devices').appendChild(row);
+            } else {
+                devices[deviceKey].lastSeen = now;
+                const row = document.getElementById(`device-${deviceKey}`);
+                row.cells[6].textContent = now;
+            }
+        });
+    </script>
+</body>
+</html>
