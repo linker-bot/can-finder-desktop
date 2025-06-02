@@ -59,7 +59,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          brew install gtk+3 webkitgtk jq pkg-config
+          brew install gtk+3 jq pkg-config
 
       - name: Install Windows prerequisites
         if: runner.os == 'Windows'
