@@ -103,24 +103,10 @@ jobs:
           }
           Rename-Item -Path $installer.FullName -NewName "${{ env.BUILD_NAME }}.exe"
 
-      - name: Install nfpm (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
-
-      - name: Package with nfpm (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          NAME=${{ env.BUILD_NAME }} VERSION=${{ env.BUILD_VER }} nfpm pkg --packager deb --config nfpm.yaml -t ${{ env.BUILD_NAME }}.deb
-          NAME=${{ env.BUILD_NAME }} VERSION=${{ env.BUILD_VER }} nfpm pkg --packager rpm --config nfpm.yaml -t ${{ env.BUILD_NAME }}.rpm
-
       - name: Show build artifacts
         shell: bash
         run: |
           ls -alh ./build/bin || true
-          ls -alh *.deb *.rpm || true
           ls -alh build/*.app || true
 
       - name: Archive macOS App
@@ -129,16 +115,6 @@ jobs:
         run: |
           cd build/bin
           zip -r ../../${{ env.BUILD_NAME }}.zip *.app
-
-      - name: Upload Release Assets (Linux)
-        if: runner.os == 'Linux'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            *.deb
-            *.rpm
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release Assets (macOS)
         if: runner.os == 'macOS'
