@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set build name with tag
         shell: bash
@@ -52,9 +52,9 @@ jobs:
           echo "Version: ${{ env.BUILD_VER }}"
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
-          go-version: "1.27.3"
+          go-version: "1.27.4"
 
       - name: Install Linux prerequisites
         if: runner.os == 'Linux'
@@ -71,7 +71,7 @@ jobs:
 
       - name: Install Windows prerequisites
         if: runner.os == 'Windows'
-        uses: crazy-max/ghaction-chocolatey@v2
+        uses: crazy-max/ghaction-chocolatey@dfdcf5bba9c0a16358a21c13a06ec5c89024b3ac # v4.1.0
         with:
           args: install nsis jq
 
@@ -142,7 +142,7 @@ jobs:
 
       - name: Upload Release Assets (macOS)
         if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: |
             *.zip
@@ -151,7 +151,7 @@ jobs:
 
       - name: Upload Release Assets (Windows)
         if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: |
             build/bin/${{ env.BUILD_NAME }}.exe
@@ -159,7 +159,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Preserve native build artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-${{ runner.os }}
           path: |
@@ -169,7 +169,7 @@ jobs:
 
       - name: Upload Release Assets (Linux)
         if: runner.os == 'Linux' && startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: build/bin/${{ env.BUILD_NAME }}
         env:
